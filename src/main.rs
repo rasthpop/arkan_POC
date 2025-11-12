@@ -18,6 +18,9 @@ use rp_pico::hal::{
     Sio
 };
 
+mod sleep;
+use sleep::{disable_uart0, enable_uart0, sleep_ms};
+
 use usb_device::class_prelude::UsbBusAllocator;
 use usbd_serial::SerialPort;
 use usb_device::prelude::UsbVidPid;
@@ -37,6 +40,7 @@ fn main() -> ! {
     )
     .ok()
     .unwrap();
+    let mut timer = rp_pico::hal::timer::Timer::new(pac.TIMER, &mut pac.RESETS, &clocks);
 
     let sio = Sio::new(pac.SIO);
     let core = pac::CorePeripherals::take().unwrap();
@@ -77,6 +81,8 @@ fn main() -> ! {
         .unwrap();
     let mut buf = [0u8; 128];
     let mut i = 0;
+    
+    let mut last_success_time: u64 = timer.get_counter().ticks();
     loop {
         if usb_dev.poll(&mut [&mut serial]) {
             // todo
@@ -85,13 +91,36 @@ fn main() -> ! {
         if let Ok(b) = uart.read() {
             if b == b'\n' {
                 let line = &buf[..i];
-                gps_proccess::gps_proccess(line, &mut serial);
-                i=0;
+                let success = gps_proccess::gps_proccess(line, &mut serial);
+                if success {
+                    last_success_time = timer.get_counter().ticks();
+                }
+                i = 0;
+            } else if b == b'\r' {
+                // ignore CR from CRLF
             } else if i < buf.len() {
                 buf[i] = b;
-                i+=1;
+                i += 1;
             } else {
-                i=0;
+                // buffer full: reset and store current byte as first byte
+                i = 0;
+                if !buf.is_empty() {
+                    buf[0] = b;
+                    i = 1;
+                }
+            }
+
+            let now = timer.get_counter().ticks();
+            if now.wrapping_sub(last_success_time) > 30_000_000 {
+                let _ = serial.write(b"No valid GPS data for 30 sec, going to sleep...\r\n");
+                disable_uart0();
+                let _ = led_pin.set_low();
+                sleep_ms(&mut timer, 30_000); // sleep 30 s
+                enable_uart0();
+                let _ = led_pin.set_high();
+
+                let _ = serial.write(b"Woke up from sleep, retrying GPS connection...\r\n");
+                last_success_time = timer.get_counter().ticks();
             }
         }
     }
