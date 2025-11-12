@@ -1,6 +1,9 @@
 #![no_std]
 #![no_main]
 
+mod encryption;
+// use crate::encryption::{CoordinateEncryptor, EncryptConfig, GpsCoord, MyCipher};
+
 use embedded_hal::digital::v2::OutputPin;
 use panic_halt as _;
 
