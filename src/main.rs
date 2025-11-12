@@ -3,7 +3,7 @@
 
 use embedded_hal::serial::Read;
 use panic_halt as _;
-
+mod gps_proccess;
 use rp_pico::entry;
 use rp_pico::hal::fugit::HertzU32;
 use rp_pico::hal::{
@@ -59,22 +59,35 @@ fn main() -> ! {
 
     let mut led_pin = pins.led.into_push_pull_output();
     let uart_pins = (
-        pins.gpio8.into_function::<rp_pico::hal::gpio::FunctionUart>(),
-        pins.gpio9.into_function::<rp_pico::hal::gpio::FunctionUart>()
+        pins.gpio0.into_function::<rp_pico::hal::gpio::FunctionUart>(),//tx
+        pins.gpio1.into_function::<rp_pico::hal::gpio::FunctionUart>()//rx
     );
-    let mut uart = UartPeripheral::new(pac.UART1, uart_pins, &mut pac.RESETS)
+    let mut uart = UartPeripheral::new(
+        pac.UART0, 
+        uart_pins, 
+        &mut pac.RESETS)
         .enable(
             UartConfig::new(HertzU32::Hz(9600), DataBits::Eight, None, StopBits::One),
             clocks.peripheral_clock.freq()
         )
         .unwrap();
+    let mut buf = [0u8; 128];
+    let mut i = 0;
     loop {
         if usb_dev.poll(&mut [&mut serial]) {
-            match uart.read() {
-                Ok(b) => {
-                    let _ = serial.write(&[b]);
-                }
-                Err(_) => {}
+            // todo
+        }
+        
+        if let Ok(b) = uart.read() {
+            if b == b'\n' {
+                let line = &buf[..i];
+                gps_proccess::gps_proccess(line, &mut serial);
+                i=0;
+            } else if i < buf.len() {
+                buf[i] = b;
+                i+=1;
+            } else {
+                i=0;
             }
         }
     }

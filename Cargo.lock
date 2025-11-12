@@ -9,6 +9,7 @@ dependencies = [
  "cortex-m",
  "cortex-m-rt",
  "embedded-hal 0.2.7",
+ "heapless",
  "panic-halt",
  "rp-pico",
  "usb-device",
