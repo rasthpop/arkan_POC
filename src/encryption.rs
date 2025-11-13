@@ -1,58 +1,12 @@
-//! Encryption template for GPS coordinates (no_std-friendly).
-//!
-//! What this gives you:
-//! - A `GpsCoord` data model (fixed-point, integer-based).
-//! - An `EncryptConfig` for key/IV/AAD inputs.
-//! - An `EncryptionError` and `Result` alias.
-//! - A `CoordinateEncryptor` trait describing the contract.
-//! - A stub `MyCipher` you can fill with your algorithm.
-//!
-//! What it does NOT include:
-//! - Any GPS receiving/driver logic (you said this is elsewhere).
-//! - Any real encryption logic (intentionally left as TODOs).
-//!
-//! Example (how you might use it from `main.rs`):
-//!
-//! ```ignore
-//! // Add at the top of main.rs
-//! // mod encryption;
-//!
-//! `use crate::encryption::{CoordinateEncryptor, EncryptConfig, GpsCoord, MyCipher};`
-//!
-//! // ... after you have valid coordinates from your GPS module:
-//! let coords = GpsCoord {
-//!     // Degrees in 1e-7 fixed-point format (e.g., 50.4501000° => 504501000)
-//!     lat_deg_e7: 504501000,
-//!     lon_deg_e7: 306232000,
-//!     // Altitude in millimeters (optional). For example 123.456 m = 123456 mm
-//!     alt_mm: Some(123_456),
-//! };
-//!
-//! let cfg = EncryptConfig {
-//!     key: b"YOUR-KEY-BYTES-HERE",   // TODO: supply your real key bytes
-//!     iv: Some(&[0u8; 12]),           // TODO: supply your IV/nonce if your scheme needs it
-//!     aad: None,                      // Optional AAD for AEAD schemes
-//! };
-//!
-//! let mut cipher = MyCipher::default();
-//! let mut out = [0u8; 128]; // caller-provided buffer for ciphertext/tag
-//! let used = cipher.encrypt_into(&coords, &cfg, &mut out).unwrap();
-//! let ciphertext = &out[..used];
-//! // Transmit or store `ciphertext` 
-//! ```
-
 #![allow(dead_code)]
 
 use core::fmt;
 
-/// GPS coordinates in fixed-point format for deterministic, no_std-friendly use.
 /// - `lat_deg_e7` and `lon_deg_e7`: degrees scaled by 1e7 (e.g., 50.4501° => 504501000)
-/// - `alt_mm`: optional altitude in millimeters
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct GpsCoord {
     pub lat_deg_e7: i32,
     pub lon_deg_e7: i32,
-    pub alt_mm: Option<i32>,
 }
 
 /// Configuration inputs commonly needed by encryption algorithms.
@@ -94,12 +48,6 @@ impl fmt::Debug for EncryptionError {
 pub type Result<T> = core::result::Result<T, EncryptionError>;
 
 /// Trait describing the contract for a coordinate encryption algorithm.
-///
-/// Contract (recommended):
-/// - Deterministic serialization of coordinates to bytes.
-/// - Proper handling of key/IV sizes and errors.
-/// - Caller-provided output buffer to avoid allocations.
-/// - Return the number of bytes written into `out`.
 pub trait CoordinateEncryptor {
     /// Encrypts the given coordinates into `out` using provided config.
     /// Returns the number of bytes written.
@@ -113,7 +61,6 @@ pub struct MyCipher {
 }
 
 impl MyCipher {
-    /// Create a new instance; extend as needed.
     pub const fn new() -> Self {
         Self {}
     }
@@ -124,8 +71,6 @@ impl MyCipher {
     /// Binary format (little-endian):
     /// - lat_deg_e7: i32 (4 bytes)
     /// - lon_deg_e7: i32 (4 bytes)
-    /// - alt_mm_present: u8 (1 if Some, 0 if None)
-    /// - alt_mm: i32 (4 bytes) only when present
     fn serialize_coords<'b>(&self, coords: &GpsCoord, buf: &'b mut [u8]) -> Result<&'b [u8]> {
         // Minimum 9 bytes without altitude, 13 bytes with altitude.
         let need = if coords.alt_mm.is_some() { 13 } else { 9 };
@@ -135,15 +80,6 @@ impl MyCipher {
         buf[0..4].copy_from_slice(&coords.lat_deg_e7.to_le_bytes());
         // Write lon (LE)
         buf[4..8].copy_from_slice(&coords.lon_deg_e7.to_le_bytes());
-        // Flag for altitude presence
-        buf[8] = if coords.alt_mm.is_some() { 1 } else { 0 };
-
-        let used = if let Some(alt) = coords.alt_mm {
-            buf[9..13].copy_from_slice(&alt.to_le_bytes());
-            13
-        } else {
-            9
-        };
 
         Ok(&buf[..used])
     }
