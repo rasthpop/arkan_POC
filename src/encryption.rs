@@ -72,8 +72,7 @@ impl MyCipher {
     /// - lat_deg_e7: i32 (4 bytes)
     /// - lon_deg_e7: i32 (4 bytes)
     fn serialize_coords<'b>(&self, coords: &GpsCoord, buf: &'b mut [u8]) -> Result<&'b [u8]> {
-        // Minimum 9 bytes without altitude, 13 bytes with altitude.
-        let need = if coords.alt_mm.is_some() { 13 } else { 9 };
+        let need = 8;
         if buf.len() < need { return Err(EncryptionError::BufferTooSmall); }
 
         // Write lat (LE)
@@ -81,7 +80,7 @@ impl MyCipher {
         // Write lon (LE)
         buf[4..8].copy_from_slice(&coords.lon_deg_e7.to_le_bytes());
 
-        Ok(&buf[..used])
+        Ok(&buf[..need])
     }
 }
 
