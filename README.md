@@ -1,6 +1,5 @@
 # Autonomous Radio-Beacon Coordinator for Air Reconnaissance and Warning (ARCAN)
-<img width="1475" height="881" alt="image" src="https://github.com/user-attachments/assets/0fef5989-b67a-48fd-a780-615ce4ae5fee" />
-
+<img width="1624" height="892" alt="image" src="https://github.com/user-attachments/assets/74267460-a938-4b69-ba5c-191813690dd2" />
 ## Software Usage
 
 ### Clean Target
