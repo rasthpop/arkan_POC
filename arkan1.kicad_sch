@@ -373,8 +373,8 @@
 			(exclude_from_sim no)
 			(in_bom yes)
 			(on_board yes)
-			(property "Reference" "J"
-				(at 0 22.225 0)
+			(property "Reference" "J2"
+				(at -14.224 2.286 90)
 				(effects
 					(font
 						(size 1.27 1.27)
@@ -382,14 +382,14 @@
 				)
 			)
 			(property "Value" "USB_C_Receptacle_USB2.0_16P"
-				(at 0 19.685 0)
+				(at -11.684 2.286 90)
 				(effects
 					(font
 						(size 1.27 1.27)
 					)
 				)
 			)
-			(property "Footprint" ""
+			(property "Footprint" "Connector_USB:USB_C_Receptacle_GCT_USB4105-xx-A_16P_TopMnt_Horizontal"
 				(at 3.81 0 0)
 				(effects
 					(font
@@ -841,7 +841,7 @@
 						)
 					)
 				)
-				(pin passive line
+				(pin power_out line
 					(at 15.24 15.24 180)
 					(length 5.08)
 					(name "VBUS"
@@ -5373,7 +5373,7 @@
 						)
 					)
 				)
-				(pin output line
+				(pin power_out line
 					(at 17.78 7.62 180)
 					(length 5.08)
 					(name "OUT"
@@ -5795,6 +5795,10 @@
 	(no_connect
 		(at 330.2 124.46)
 		(uuid "4cee3141-e0a9-42c2-bee6-1a65b8194ee4")
+	)
+	(no_connect
+		(at 213.36 217.17)
+		(uuid "5d99d4fb-ddb3-4aef-96f4-03758782a6c8")
 	)
 	(no_connect
 		(at 213.36 240.03)
