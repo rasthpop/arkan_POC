@@ -7918,7 +7918,7 @@
 				(justify right)
 			)
 		)
-		(property "Footprint" "Package_SO:SOIC-8-1EP_3.9x4.9mm_P1.27mm_EP2.41x3.3mm_ThermalVias"
+		(property "Footprint" "Package_SO:SOIC-8-1EP_3.9x4.9mm_P1.27mm_EP2.41x3.81mm"
 			(at 111.252 262.89 0)
 			(effects
 				(font
@@ -9315,7 +9315,7 @@
 				)
 			)
 		)
-		(property "Footprint" "Resistor_SMD:R_0805_2012Metric"
+		(property "Footprint" "LED_SMD:LED_0805_2012Metric"
 			(at 267.97 114.3 0)
 			(effects
 				(font
@@ -10601,7 +10601,7 @@
 				(justify right)
 			)
 		)
-		(property "Footprint" "Resistor_SMD:R_0805_2012Metric"
+		(property "Footprint" "LED_SMD:LED_0805_2012Metric"
 			(at 137.16 234.95 0)
 			(effects
 				(font
@@ -11377,7 +11377,7 @@
 				(justify right)
 			)
 		)
-		(property "Footprint" "Resistor_SMD:R_0805_2012Metric"
+		(property "Footprint" "LED_SMD:LED_0805_2012Metric"
 			(at 128.27 234.95 0)
 			(effects
 				(font
