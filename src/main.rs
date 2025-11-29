@@ -11,6 +11,7 @@ mod gps_proccess;
 use rp_pico::entry;
 use rp_pico::hal::fugit::HertzU32;
 use rp_pico::hal::{
+    spi::Spi,
     clocks::{init_clocks_and_plls, Clock},
     pac,
     uart::{DataBits, StopBits, UartConfig, UartPeripheral},
@@ -59,6 +60,36 @@ fn main() -> ! {
         true,
         &mut pac.RESETS,
     ));
+    let spi_sck = pins.gpio18.into_function::<rp_pico::hal::gpio::FunctionSpi>();
+    let spi_mosi = pins.gpio19.into_function::<rp_pico::hal::gpio::FunctionSpi>();
+    let spi_miso = pins.gpio16.into_function::<rp_pico::hal::gpio::FunctionSpi>();
+    let spi= Spi::new(
+        pac.SPI0,
+        (
+            spi_mosi,
+            spi_miso,
+            spi_sck
+        ),
+    );
+    let spi0:Spi<_,_,_,8> = spi.init(
+        &mut pac.RESETS,
+        clocks.peripheral_clock.freq(),
+        HertzU32::Hz(8_000_000),
+        embedded_hal::spi::MODE_0,
+    );
+
+    let mut nss = pins.gpio17.into_push_pull_output();
+    nss.set_high().unwrap();
+    let mut rst = pins.gpio20.into_push_pull_output();
+    rst.set_high().unwrap();
+    let mut lora = sx127x_lora::LoRa::new(
+        spi0,
+        nss,
+        rst,
+        433,
+        delay
+    ).expect("Could not connect to LoRa");
+    lora.set_tx_power(17, 1);
 
     let mut serial = SerialPort::new(&usb_bus);
     let mut usb_dev = UsbDeviceBuilder::new(&usb_bus, UsbVidPid(0x16c0, 0x27dd))
@@ -81,13 +112,22 @@ fn main() -> ! {
         .unwrap();
     let mut buf = [0u8; 128];
     let mut i = 0;
-    
+    let gps_payload = b"test";
+    let mut buf = [0u8; 255];
+    buf[..gps_payload.len()].copy_from_slice(gps_payload);
     let mut last_success_time: u64 = timer.get_counter().ticks();
     loop {
         if usb_dev.poll(&mut [&mut serial]) {
             // todo
         }
-        
+        match lora.transmit_payload(buf, gps_payload.len()) {
+            Ok(sent_bytes) => { 
+                let _ = serial.write(b"sent bytes\r\n");
+             },
+            Err(_) => { 
+                let _ = serial.write(b"ERR\r\n");
+             }
+        }
         if let Ok(b) = uart.read() {
             if b == b'\n' {
                 let line = &buf[..i];

@@ -14,6 +14,7 @@ dependencies = [
  "nb 1.1.0",
  "panic-halt",
  "rp-pico",
+ "sx127x_lora",
  "usb-device",
  "usbd-serial",
 ]
@@ -32,6 +33,12 @@ checksum = "5deb64efa5bd81e31fcd1938615a6d98c82eafcbcd787162b6f63b91d6bac5b3"
 dependencies = [
  "rustc_version",
 ]
+
+[[package]]
+name = "bit_field"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ed8765909f9009617974ab6b7d332625b320b33c326b1e9321382ef1999b5d56"
 
 [[package]]
 name = "bitfield"
@@ -505,6 +512,16 @@ name = "stable_deref_trait"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6ce2be8dc25455e1f91df71bfa12ad37d7af1092ae736f3a6cd0e37bc7810596"
+
+[[package]]
+name = "sx127x_lora"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1bd56f85048acf50f3930d181277cc8f17a33f8008496272c2ce48f8d2294896"
+dependencies = [
+ "bit_field",
+ "embedded-hal 0.2.7",
+]
 
 [[package]]
 name = "syn"
