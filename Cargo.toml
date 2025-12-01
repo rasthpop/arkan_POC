@@ -14,6 +14,7 @@ usbd-serial = "0.2.2"
 heapless = "0.8"
 chacha20 = { version = "0.9", default-features = false }
 nb = "1.0"
+sx127x_lora = "0.3.1"
 
 [profile.release]
 debug = true

@@ -42,27 +42,27 @@ fn nmea_to_e7(txt: &[u8], is_lat: bool) -> Option<i32> {
     Some(deg_e7 as i32)
 }
 
-pub fn gps_proccess(line: &[u8], serial: &mut SerialPort<UsbBus>) -> bool {
+pub fn gps_proccess(line: &[u8], serial: &mut SerialPort<UsbBus>, lora_buf: &mut [u8; 255]) -> Option<usize>  {
     if field(line, 0) != Some(b"$GNGGA") {
-        return false;
+        return None;
     }
     let fix_quality = field(line, 6);
     if fix_quality != Some(b"1") && fix_quality != Some(b"2") {
         let _ = serial.write(b"GGA invalid\r\n");
-        return false;
+        return None;
     }
-    let lat_raw = match field(line, 2) { Some(v) => v, None => return false, };
-    let lat_hemi = match field(line, 3) { Some(v) => v, None => return false, };
-    let lon_raw = match field(line, 4) { Some(v) => v, None => return false, };
-    let lon_hemi = match field(line, 5) { Some(v) => v, None => return false, };
+    let lat_raw = match field(line, 2) { Some(v) => v, None => return None, };
+    let lat_hemi = match field(line, 3) { Some(v) => v, None => return None, };
+    let lon_raw = match field(line, 4) { Some(v) => v, None => return None, };
+    let lon_hemi = match field(line, 5) { Some(v) => v, None => return None, };
 
-    let count_sat = match field(line, 7) { Some(v) => v, None => return false, };
+    let count_sat = match field(line, 7) { Some(v) => v, None => return None, };
     let _ = serial.write(b"Satellites: ");
     let _ = serial.write(count_sat);
     let _ = serial.write(b"\r\n");
 
-    let mut lat = match nmea_to_e7(lat_raw, true) { Some(v) => v, None => return false, };
-    let mut lon = match nmea_to_e7(lon_raw, false) { Some(v) => v, None => return false, };
+    let mut lat = match nmea_to_e7(lat_raw, true) { Some(v) => v, None => return None, };
+    let mut lon = match nmea_to_e7(lon_raw, false) { Some(v) => v, None => return None, };
 
     if lat_hemi == b"S" { lat = -lat; }
     if lon_hemi == b"W" { lon = -lon; }
@@ -86,5 +86,9 @@ pub fn gps_proccess(line: &[u8], serial: &mut SerialPort<UsbBus>) -> bool {
     let _ = write!(out, "lat_e7={}, lon_e7={}\r\n", lat, lon);
     let _ = serial.write(out.as_bytes());
 
-    return true;
+
+    let bytes = out.as_bytes();
+    lora_buf[..bytes.len()].copy_from_slice(bytes);
+
+    Some(bytes.len())
 }
