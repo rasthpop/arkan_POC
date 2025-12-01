@@ -89,7 +89,7 @@ fn main() -> ! {
         433,
         delay
     ).expect("Could not connect to LoRa");
-    lora.set_tx_power(17, 1);
+    let _ = lora.set_tx_power(17, 1);
 
     let mut serial = SerialPort::new(&usb_bus);
     let mut usb_dev = UsbDeviceBuilder::new(&usb_bus, UsbVidPid(0x16c0, 0x27dd))
@@ -112,29 +112,28 @@ fn main() -> ! {
         .unwrap();
     let mut buf = [0u8; 128];
     let mut i = 0;
-    let gps_payload = b"test";
-    let mut buf = [0u8; 255];
-    buf[..gps_payload.len()].copy_from_slice(gps_payload);
+    let mut lora_buf = [0u8; 255];
     let mut last_success_time: u64 = timer.get_counter().ticks();
     loop {
         if usb_dev.poll(&mut [&mut serial]) {
             // todo
         }
-        match lora.transmit_payload(buf, gps_payload.len()) {
-            Ok(sent_bytes) => { 
-                let _ = serial.write(b"sent bytes\r\n");
-             },
-            Err(_) => { 
-                let _ = serial.write(b"ERR\r\n");
-             }
-        }
+        
         if let Ok(b) = uart.read() {
             if b == b'\n' {
                 let line = &buf[..i];
-                let success = gps_proccess::gps_proccess(line, &mut serial);
-                if success {
+                if let Some(len) = gps_proccess::gps_proccess(line, &mut serial,&mut lora_buf) {
                     last_success_time = timer.get_counter().ticks();
+                    match lora.transmit_payload(lora_buf, len) {
+                        Ok(sent_bytes) => { 
+                            let _ = serial.write(b"sent bytes\r\n");
+                        },
+                        Err(_) => { 
+                            let _ = serial.write(b"ERR\r\n");
+                        }
+                    }
                 }
+                
                 i = 0;
             } else if b == b'\r' {
                 // ignore CR from CRLF
@@ -149,7 +148,6 @@ fn main() -> ! {
                     i = 1;
                 }
             }
-
             let now = timer.get_counter().ticks();
             if now.wrapping_sub(last_success_time) > 30_000_000 {
                 let _ = serial.write(b"No valid GPS data for 30 sec, going to sleep...\r\n");
