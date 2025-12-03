@@ -125,7 +125,7 @@ fn main() -> ! {
                 if let Some(len) = gps_proccess::gps_proccess(line, &mut serial,&mut lora_buf) {
                     last_success_time = timer.get_counter().ticks();
                     match lora.transmit_payload(lora_buf, len) {
-                        Ok(sent_bytes) => { 
+                        Ok(sent_bytes) => {
                             let _ = serial.write(b"sent bytes\r\n");
                         },
                         Err(_) => { 
