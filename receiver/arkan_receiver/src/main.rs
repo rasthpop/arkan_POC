@@ -2,12 +2,10 @@
 #![no_main]
 
 use embedded_hal::serial::Read;
-mod encryption;
 // use crate::encryption::{CoordinateEncryptor, EncryptConfig, GpsCoord, MyCipher};
 
 use embedded_hal::digital::v2::OutputPin;
 use panic_halt as _;
-mod gps_proccess;
 use rp_pico::entry;
 use rp_pico::hal::fugit::HertzU32;
 use rp_pico::hal::{
@@ -18,9 +16,6 @@ use rp_pico::hal::{
     watchdog::Watchdog,
     Sio
 };
-
-mod sleep;
-use sleep::{disable_uart0, enable_uart0, sleep_ms};
 
 use usb_device::class_prelude::UsbBusAllocator;
 use usbd_serial::SerialPort;
@@ -97,19 +92,6 @@ fn main() -> ! {
         .build();
 
     let mut led_pin = pins.led.into_push_pull_output();
-    let uart_pins = (
-        pins.gpio0.into_function::<rp_pico::hal::gpio::FunctionUart>(),//tx
-        pins.gpio1.into_function::<rp_pico::hal::gpio::FunctionUart>()//rx
-    );
-    let mut uart = UartPeripheral::new(
-        pac.UART0, 
-        uart_pins, 
-        &mut pac.RESETS)
-        .enable(
-            UartConfig::new(HertzU32::Hz(9600), DataBits::Eight, None, StopBits::One),
-            clocks.peripheral_clock.freq()
-        )
-        .unwrap();
     let mut buf = [0u8; 128];
     let mut i = 0;
     let mut lora_buf = [0u8; 255];
@@ -118,47 +100,12 @@ fn main() -> ! {
         if usb_dev.poll(&mut [&mut serial]) {
             // todo
         }
-        
-        if let Ok(b) = uart.read() {
-            if b == b'\n' {
-                let line = &buf[..i];
-                if let Some(len) = gps_proccess::gps_proccess(line, &mut serial,&mut lora_buf) {
-                    last_success_time = timer.get_counter().ticks();
-                    match lora.transmit_payload(lora_buf, len) {
-                        Ok(sent_bytes) => {
-                            let _ = serial.write(b"sent bytes\r\n");
-                        },
-                        Err(_) => { 
-                            let _ = serial.write(b"ERR\r\n");
-                        }
-                    }
-                }
-                
-                i = 0;
-            } else if b == b'\r' {
-                // ignore CR from CRLF
-            } else if i < buf.len() {
-                buf[i] = b;
-                i += 1;
-            } else {
-                // buffer full: reset and store current byte as first byte
-                i = 0;
-                if !buf.is_empty() {
-                    buf[0] = b;
-                    i = 1;
-                }
-            }
-            let now = timer.get_counter().ticks();
-            if now.wrapping_sub(last_success_time) > 30_000_000 {
-                let _ = serial.write(b"No valid GPS data for 30 sec, going to sleep...\r\n");
-                disable_uart0();
-                let _ = led_pin.set_low();
-                sleep_ms(&mut timer, 30_000); // sleep 30 s
-                enable_uart0();
-                let _ = led_pin.set_high();
-
-                let _ = serial.write(b"Woke up from sleep, retrying GPS connection...\r\n");
-                last_success_time = timer.get_counter().ticks();
+        if let Ok(size) = lora.poll_irq(None) {
+            if let Ok(r_buf) = lora.read_packet() {
+                let packet = &r_buf[..size];
+                let _ = serial.write(b"RECEIVED DATA\r\n");
+                let _ = serial.write(packet);
+                let _ = serial.write(b"\r\n");
             }
         }
     }
