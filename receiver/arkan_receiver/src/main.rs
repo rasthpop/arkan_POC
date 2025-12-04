@@ -2,7 +2,6 @@
 #![no_main]
 
 use embedded_hal::serial::Read;
-// use crate::encryption::{CoordinateEncryptor, EncryptConfig, GpsCoord, MyCipher};
 
 use embedded_hal::digital::v2::OutputPin;
 use panic_halt as _;
