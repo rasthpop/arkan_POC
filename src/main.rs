@@ -45,7 +45,7 @@ fn main() -> ! {
 
     let sio = Sio::new(pac.SIO);
     let core = pac::CorePeripherals::take().unwrap();
-    let mut delay = cortex_m::delay::Delay::new(core.SYST, clocks.system_clock.freq().to_Hz());
+    let delay = cortex_m::delay::Delay::new(core.SYST, clocks.system_clock.freq().to_Hz());
     let pins = rp_pico::Pins::new(
         pac.IO_BANK0,
         pac.PADS_BANK0,
@@ -98,11 +98,11 @@ fn main() -> ! {
 
     let mut led_pin = pins.led.into_push_pull_output();
     let uart_pins = (
-        pins.gpio0.into_function::<rp_pico::hal::gpio::FunctionUart>(),//tx
-        pins.gpio1.into_function::<rp_pico::hal::gpio::FunctionUart>()//rx
+        pins.gpio8.into_function::<rp_pico::hal::gpio::FunctionUart>(),//tx
+        pins.gpio9.into_function::<rp_pico::hal::gpio::FunctionUart>()//rx
     );
     let mut uart = UartPeripheral::new(
-        pac.UART0, 
+        pac.UART1, 
         uart_pins, 
         &mut pac.RESETS)
         .enable(
@@ -125,8 +125,8 @@ fn main() -> ! {
                 if let Some(len) = gps_proccess::gps_proccess(line, &mut serial,&mut lora_buf) {
                     last_success_time = timer.get_counter().ticks();
                     match lora.transmit_payload(lora_buf, len) {
-                        Ok(sent_bytes) => {
-                            let _ = serial.write(b"sent bytes\r\n");
+                        Ok(_) => {
+                            let _ = serial.write(b"sent data to LoRa\r\n");
                         },
                         Err(_) => { 
                             let _ = serial.write(b"ERR\r\n");
