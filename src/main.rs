@@ -20,7 +20,7 @@ use rp_pico::hal::{
 };
 
 mod sleep;
-use sleep::{disable_uart0, enable_uart0, sleep_ms};
+use sleep::{disable_uart1, enable_uart1, sleep_ms};
 
 use usb_device::class_prelude::UsbBusAllocator;
 use usbd_serial::SerialPort;
@@ -151,10 +151,10 @@ fn main() -> ! {
             let now = timer.get_counter().ticks();
             if now.wrapping_sub(last_success_time) > 30_000_000 {
                 let _ = serial.write(b"No valid GPS data for 30 sec, going to sleep...\r\n");
-                disable_uart0();
+                disable_uart1();
                 let _ = led_pin.set_low();
                 sleep_ms(&mut timer, 30_000); // sleep 30 s
-                enable_uart0();
+                enable_uart1    ();
                 let _ = led_pin.set_high();
 
                 let _ = serial.write(b"Woke up from sleep, retrying GPS connection...\r\n");

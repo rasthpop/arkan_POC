@@ -1,9 +1,10 @@
 #![no_std]
 #![no_main]
 
+use core::fmt::Write;
 use embedded_hal::serial::Read;
+use heapless::String;
 
-use embedded_hal::digital::v2::OutputPin;
 use panic_halt as _;
 use rp_pico::entry;
 use rp_pico::hal::fugit::HertzU32;
@@ -15,6 +16,9 @@ use rp_pico::hal::{
     watchdog::Watchdog,
     Sio
 };
+
+mod decryption;
+use decryption::{decrypt_packet, DecryptError};
 
 use usb_device::class_prelude::UsbBusAllocator;
 use usbd_serial::SerialPort;
@@ -35,7 +39,6 @@ fn main() -> ! {
     )
     .ok()
     .unwrap();
-    let mut timer = rp_pico::hal::timer::Timer::new(pac.TIMER, &mut pac.RESETS, &clocks);
 
     let sio = Sio::new(pac.SIO);
     let core = pac::CorePeripherals::take().unwrap();
@@ -89,12 +92,7 @@ fn main() -> ! {
     let mut usb_dev = UsbDeviceBuilder::new(&usb_bus, UsbVidPid(0x16c0, 0x27dd))
         .device_class(2)
         .build();
-
-    let mut led_pin = pins.led.into_push_pull_output();
-    let mut buf = [0u8; 128];
-    let mut i = 0;
-    let mut lora_buf = [0u8; 255];
-    let mut last_success_time: u64 = timer.get_counter().ticks();
+    
     loop {
         if usb_dev.poll(&mut [&mut serial]) {
             // todo
@@ -102,9 +100,32 @@ fn main() -> ! {
         if let Ok(size) = lora.poll_irq(None) {
             if let Ok(r_buf) = lora.read_packet() {
                 let packet = &r_buf[..size];
-                let _ = serial.write(b"RECEIVED DATA\r\n");
-                let _ = serial.write(packet);
+
+                let _ = serial.write(b"RX RAW: ");
+                for b in packet {
+                    let mut hex = heapless::String::<4>::new();
+                    let _ = write!(hex, "{:02X} ", b);
+                    let _ = serial.write(hex.as_bytes());
+                }
                 let _ = serial.write(b"\r\n");
+
+                match decrypt_packet(packet) {
+                    Ok(coord) => {
+                        let _ = serial.write(b"DEC lat/lon: ");
+                        let mut msg = heapless::String::<64>::new();
+                        let _ = write!(msg, "{}, {}\r\n", coord.lat_deg_e7, coord.lon_deg_e7);
+                        let _ = serial.write(msg.as_bytes());
+                    }
+                    Err(err) => {
+                        let mut msg = heapless::String::<64>::new();
+                        let _ = match err {
+                            DecryptError::PacketTooShort => write!(msg, "Decrypt error: packet too short\r\n"),
+                            DecryptError::CipherError => write!(msg, "Decrypt error: cipher init failed\r\n"),
+                            DecryptError::MalformedPlaintext => write!(msg, "Decrypt error: invalid plaintext\r\n"),
+                        };
+                        let _ = serial.write(msg.as_bytes());
+                    }
+                }
             }
         }
     }

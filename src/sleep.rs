@@ -42,21 +42,21 @@ pub fn sleep_ms(timer: &mut Timer, ms: u32) {
     unsafe { NVIC::mask(Interrupt::TIMER_IRQ_0); }
 }
 
-/// Disable UART0 transmit/receive paths to reduce power before sleep.
-pub fn disable_uart0() {
+/// Disable UART1 transmit/receive paths to reduce power before sleep.
+pub fn disable_uart1() {
     unsafe {
-        let uart0 = &*pac::UART0::ptr();
-        uart0
+        let uart1 = &*pac::UART1::ptr();
+        uart1
             .uartcr()
             .modify(|_, w| w.uarten().clear_bit().txe().clear_bit().rxe().clear_bit());
     }
 }
 
-/// Re-enable UART0 after waking from sleep.
-pub fn enable_uart0() {
+/// Re-enable UART1 after waking from sleep.
+pub fn enable_uart1() {
     unsafe {
-        let uart0 = &*pac::UART0::ptr();
-        uart0
+        let uart1 = &*pac::UART1::ptr();
+        uart1
             .uartcr()
             .modify(|_, w| w.uarten().set_bit().txe().set_bit().rxe().set_bit());
     }
