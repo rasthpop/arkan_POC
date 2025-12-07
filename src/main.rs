@@ -117,7 +117,7 @@ fn main() -> ! {
     let mut buf = [0u8; 128];
     let mut i = 0;
     let mut lora_buf = [0u8; 255];
-    let dat = b"tarasryba";
+    let dat = b"test-output";
     let len = dat.len();
     lora_buf[..len].copy_from_slice(dat);
     let mut last_success_time: u64 = timer.get_counter().ticks();
