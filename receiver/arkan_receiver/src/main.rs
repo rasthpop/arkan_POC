@@ -137,9 +137,8 @@ fn main() -> ! {
 
                 match decrypt_packet(packet) {
                     Ok(coord) => {
-                        let _ = serial.write(b"DEC lat/lon: ");
                         let mut msg = heapless::String::<64>::new();
-                        let _ = write!(msg, "{}, {}\r\n", coord.lat_deg_e7, coord.lon_deg_e7);
+                        let _ = write!(msg, "{{\"lat\":{},\"long\":{}}}\r\n", coord.lat_deg_e7, coord.lon_deg_e7);
                         let _ = serial.write(msg.as_bytes());
                     }
                     Err(err) => {
