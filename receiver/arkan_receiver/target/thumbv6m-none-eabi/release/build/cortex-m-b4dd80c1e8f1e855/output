@@ -1,0 +1,4 @@
+cargo:rustc-link-lib=static=cortex-m
+cargo:rustc-link-search=/home/llevttarr/pok_prj/prj_arkan/arkan_POC/receiver/arkan_receiver/target/thumbv6m-none-eabi/release/build/cortex-m-b4dd80c1e8f1e855/out
+cargo:rustc-cfg=cortex_m
+cargo:rustc-cfg=armv6m

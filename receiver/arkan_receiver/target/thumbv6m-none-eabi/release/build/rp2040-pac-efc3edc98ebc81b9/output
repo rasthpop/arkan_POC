@@ -1,0 +1,3 @@
+cargo:rustc-link-search=/home/llevttarr/pok_prj/prj_arkan/arkan_POC/receiver/arkan_receiver/target/thumbv6m-none-eabi/release/build/rp2040-pac-efc3edc98ebc81b9/out
+cargo:rerun-if-changed=device.x
+cargo:rerun-if-changed=build.rs
