@@ -2,11 +2,13 @@
 #![no_main]
 
 use embedded_hal::serial::Read;
+use embedded_hal::blocking::delay::DelayMs;
 mod encryption;
 // use crate::encryption::{CoordinateEncryptor, EncryptConfig, GpsCoord, MyCipher};
 
 use embedded_hal::digital::v2::OutputPin;
 use panic_halt as _;
+use sx127x_lora::RadioMode;
 mod gps_proccess;
 use rp_pico::entry;
 use rp_pico::hal::fugit::HertzU32;
@@ -45,7 +47,7 @@ fn main() -> ! {
 
     let sio = Sio::new(pac.SIO);
     let core = pac::CorePeripherals::take().unwrap();
-    let delay = cortex_m::delay::Delay::new(core.SYST, clocks.system_clock.freq().to_Hz());
+    let mut delay = cortex_m::delay::Delay::new(core.SYST, clocks.system_clock.freq().to_Hz());
     let pins = rp_pico::Pins::new(
         pac.IO_BANK0,
         pac.PADS_BANK0,
@@ -60,6 +62,10 @@ fn main() -> ! {
         true,
         &mut pac.RESETS,
     ));
+    let mut serial = SerialPort::new(&usb_bus);
+    let mut usb_dev = UsbDeviceBuilder::new(&usb_bus, UsbVidPid(0x16c0, 0x27dd))
+        .device_class(2)
+        .build();
     let spi_sck = pins.gpio18.into_function::<rp_pico::hal::gpio::FunctionSpi>();
     let spi_mosi = pins.gpio19.into_function::<rp_pico::hal::gpio::FunctionSpi>();
     let spi_miso = pins.gpio16.into_function::<rp_pico::hal::gpio::FunctionSpi>();
@@ -74,14 +80,18 @@ fn main() -> ! {
     let spi0:Spi<_,_,_,8> = spi.init(
         &mut pac.RESETS,
         clocks.peripheral_clock.freq(),
-        HertzU32::Hz(8_000_000),
+        HertzU32::Hz(2_000_000),
         embedded_hal::spi::MODE_0,
     );
+    
 
     let mut nss = pins.gpio17.into_push_pull_output();
     nss.set_high().unwrap();
     let mut rst = pins.gpio20.into_push_pull_output();
+    rst.set_low().unwrap();
+    timer.delay_ms(20);
     rst.set_high().unwrap();
+    timer.delay_ms(50);
     let mut lora = sx127x_lora::LoRa::new(
         spi0,
         nss,
@@ -89,12 +99,19 @@ fn main() -> ! {
         433,
         delay
     ).expect("Could not connect to LoRa");
+    let _ = lora.set_mode(sx127x_lora::RadioMode::Sleep).unwrap();
+    timer.delay_ms(10);
     let _ = lora.set_tx_power(17, 1);
+    let _ = lora.set_crc(true);
+    let _ = lora.set_preamble_length(12);
+    let _ = lora.set_ocp(120).unwrap();
+    let _ = lora.set_coding_rate_4(8).unwrap();
+    let _ = lora.set_spreading_factor(9);
+    for _ in 0..100 {
+        usb_dev.poll(&mut [&mut serial]);
+        timer.delay_ms(10);
+    }
 
-    let mut serial = SerialPort::new(&usb_bus);
-    let mut usb_dev = UsbDeviceBuilder::new(&usb_bus, UsbVidPid(0x16c0, 0x27dd))
-        .device_class(2)
-        .build();
 
     let mut led_pin = pins.led.into_push_pull_output();
     let uart_pins = (
