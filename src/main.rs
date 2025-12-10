@@ -110,7 +110,7 @@ fn main() -> ! {
     for _ in 0..100 {
         usb_dev.poll(&mut [&mut serial]);
         timer.delay_ms(10);
-    }UartConfig
+    }
 
 
     let mut led_pin = pins.led.into_push_pull_output();
