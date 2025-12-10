@@ -110,7 +110,7 @@ fn main() -> ! {
     for _ in 0..100 {
         usb_dev.poll(&mut [&mut serial]);
         timer.delay_ms(10);
-    }
+    }UartConfig
 
 
     let mut led_pin = pins.led.into_push_pull_output();
@@ -130,7 +130,10 @@ fn main() -> ! {
     let mut buf = [0u8; 128];
     let mut i = 0;
     let mut lora_buf = [0u8; 255];
-    let mut last_success_time: u64 = timer.get_counter().ticks();
+    let mut last_lora_success: u64 = timer.get_counter().ticks();
+    let mut first_lora_success: u64 = 0;
+    let mut last_gps_success: u64 = 0;
+    let mut last_lora_packet_len: usize = 0;
     loop {
         if usb_dev.poll(&mut [&mut serial]) {
             // todo
@@ -139,11 +142,31 @@ fn main() -> ! {
         if let Ok(b) = uart.read() {
             if b == b'\n' {
                 let line = &buf[..i];
-                if let Some(len) = gps_proccess::gps_proccess(line, &mut serial,&mut lora_buf) {
-                    last_success_time = timer.get_counter().ticks();
-                    match lora.transmit_payload(lora_buf, len) {
+
+                // if we found GPS signals, process and send to LoRa
+                if let Some(len) = gps_proccess::gps_proccess(line, &mut serial, &mut lora_buf) {
+                    last_gps_success = timer.get_counter().ticks();
+                    last_lora_packet_len = len;
+
+                    match lora.transmit_payload(lora_buf, last_lora_packet_len) {
                         Ok(_) => {
                             let _ = serial.write(b"sent data to LoRa\r\n");
+                            last_lora_success = timer.get_counter().ticks();
+                            if first_lora_success == 0 {
+                                first_lora_success = last_lora_success;
+                            }
+                        },
+                        Err(_) => { 
+                            let _ = serial.write(b"ERR\r\n");
+                        }
+                    }
+
+                // if GPS fix failed now, but we have valid data from before, resend it
+                } else if last_lora_packet_len > 0 {
+                    match lora.transmit_payload(lora_buf, last_lora_packet_len) {
+                        Ok(_) => {
+                            let _ = serial.write(b"sent data to LoRa\r\n");
+                            last_lora_success = timer.get_counter().ticks();
                         },
                         Err(_) => { 
                             let _ = serial.write(b"ERR\r\n");
@@ -165,8 +188,25 @@ fn main() -> ! {
                     i = 1;
                 }
             }
+
             let now = timer.get_counter().ticks();
-            if now.wrapping_sub(last_success_time) > 30_000_000 {
+
+            // if we have been successfully sending data for 20 seconds, go to sleep
+            if now.wrapping_sub(first_lora_success) > 20_000 && first_lora_success != 0 {
+                let _ = serial.write(b"Been sending data for 20 seconds, going to sleep...\r\n");
+                disable_uart1();
+                let _ = led_pin.set_low();
+                sleep_ms(&mut timer, 30_000); // sleep 30 seconds (testing, change later)
+                enable_uart1();
+                let _ = led_pin.set_high();
+
+                let _ = serial.write(b"Woke up from sleep, retrying GPS connection...\r\n");
+                first_lora_success = 0;
+                last_lora_success = timer.get_counter().ticks();
+            }
+
+            // if we don't have any valid GPS data and did not send any packets, go to sleep and retry after
+            if now.wrapping_sub(last_gps_success) > 30_000 && now.wrapping_sub(last_lora_success) > 30_000 {
                 let _ = serial.write(b"No valid GPS data for 30 sec, going to sleep...\r\n");
                 disable_uart1();
                 let _ = led_pin.set_low();
@@ -175,7 +215,12 @@ fn main() -> ! {
                 let _ = led_pin.set_high();
 
                 let _ = serial.write(b"Woke up from sleep, retrying GPS connection...\r\n");
-                last_success_time = timer.get_counter().ticks();
+                last_lora_success = timer.get_counter().ticks(); // reset this to avoid immediate sleep
+            }
+
+            // if we did not have GPS fix for 1 day, prevent resending irrelevant data
+            if now.wrapping_sub(last_gps_success) > 86_400_000 && last_gps_success != 0 {
+                last_lora_packet_len = 0;
             }
         }
     }
