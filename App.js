@@ -18,15 +18,58 @@ const FIXED_COORDINATES = {
   longitude: 24.022562,
 };
 
+const SERVER_URL = 'http://10.10.229.67:8080/coordinates';
+
 const App = () => {
   const [userLocation, setUserLocation] = useState(null);
   const [targetCoordinate, setTargetCoordinate] = useState(FIXED_COORDINATES);
   const [hasLocationPermission, setHasLocationPermission] = useState(false);
   const [locationError, setLocationError] = useState(null);
+  const [serverStatus, setServerStatus] = useState('Not connected');
+  const [lastDataReceived, setLastDataReceived] = useState(null);
 
   useEffect(() => {
     requestLocationPermission();
+    
+    const interval = setInterval(() => {
+      fetchCoordinates();
+    }, 5000);
+
+    fetchCoordinates();
+
+    return () => clearInterval(interval);
   }, []);
+
+  const fetchCoordinates = async () => {
+    try {
+      const response = await fetch(SERVER_URL, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+        },
+        timeout: 3000,
+      });
+
+      if (!response.ok) {
+        throw new Error('Server returned ' + response.status);
+      }
+
+      const data = await response.json();
+      
+      if (data.latitude && data.longitude) {
+        setTargetCoordinate({
+          latitude: data.latitude,
+          longitude: data.longitude,
+        });
+        
+        setLastDataReceived(data.timestamp || new Date().toLocaleTimeString());
+        setServerStatus(`Connected - Last: ${data.timestamp || new Date().toLocaleTimeString()}`);
+      }
+    } catch (error) {
+      console.log('Fetch error:', error.message);
+      setServerStatus('Server offline: ' + error.message);
+    }
+  };
 
   const requestLocationPermission = async () => {
     if (Platform.OS === 'android') {
@@ -35,118 +78,71 @@ const App = () => {
           PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
           {
             title: 'Location Permission',
-            message: 'This app needs access to your location to show you on the map.',
+            message: 'This app needs access to your location.',
             buttonPositive: 'OK',
           }
         );
         
         if (granted === PermissionsAndroid.RESULTS.GRANTED) {
-          console.log('Location permission granted');
           setHasLocationPermission(true);
           startLocationTracking();
-        } else {
-          console.log('Location permission denied');
-          Alert.alert('Permission Denied', 'Location permission is required to show your position.');
         }
       } catch (err) {
         console.warn('Permission error:', err);
         setLocationError(err.message);
       }
-    } else {
-      setHasLocationPermission(true);
-      startLocationTracking();
     }
   };
 
   const startLocationTracking = () => {
-    console.log('Starting location tracking...');
-    
     Geolocation.getCurrentPosition(
       (position) => {
-        console.log('Got cached position:', position.coords);
-        const newLocation = {
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-        };
-        setUserLocation(newLocation);
-        setLocationError(null);
-      },
-      (error) => {
-        console.log('No cached location');
-      },
-      { 
-        enableHighAccuracy: false,
-        timeout: 5000,
-        maximumAge: 300000
-      }
-    );
-
-    setTimeout(() => {
-      Geolocation.getCurrentPosition(
-        (position) => {
-          console.log('Got accurate position:', position.coords);
-          const newLocation = {
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-          };
-          setUserLocation(newLocation);
-          setLocationError(null);
-        },
-        (error) => {
-          console.log('Accurate GPS failed, using network location');
-          if (!userLocation) {
-            setLocationError('Using network location (GPS unavailable)');
-          }
-        },
-        { 
-          enableHighAccuracy: true, 
-          timeout: 30000,
-          maximumAge: 0,
-          distanceFilter: 0
-        }
-      );
-    }, 1000);
-
-    const watchId = Geolocation.watchPosition(
-      (position) => {
-        console.log('Position update:', position.coords);
         setUserLocation({
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
         });
         setLocationError(null);
       },
-      (error) => {
-        console.log('Watch position error:', error);
-      },
-      { 
-        enableHighAccuracy: false,
-        distanceFilter: 10,
-        interval: 10000,
-        fastestInterval: 5000
-      }
+      (error) => console.log('No cached location'),
+      { enableHighAccuracy: false, timeout: 5000, maximumAge: 300000 }
     );
 
-    return () => Geolocation.clearWatch(watchId);
+    setTimeout(() => {
+      Geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          });
+          setLocationError(null);
+        },
+        (error) => {
+          if (!userLocation) {
+            setLocationError('Using network location');
+          }
+        },
+        { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 }
+      );
+    }, 1000);
+
+    Geolocation.watchPosition(
+      (position) => {
+        setUserLocation({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        });
+        setLocationError(null);
+      },
+      (error) => console.log('Watch error:', error),
+      { enableHighAccuracy: false, distanceFilter: 10 }
+    );
   };
 
   const handleGetCoordinates = () => {
-    setTargetCoordinate({ ...FIXED_COORDINATES });
-    Alert.alert(
-      'Coordinates Loaded',
-      `Lat: ${FIXED_COORDINATES.latitude}\nLon: ${FIXED_COORDINATES.longitude}`
-    );
+    fetchCoordinates();
   };
 
   const downloadUkraineMap = async () => {
-    const progressListener = (offlineRegion, status) => {
-      console.log(`Download progress: ${status.percentage}%`);
-    };
-
-    const errorListener = (offlineRegion, error) => {
-      console.log('Download error:', error);
-    };
-
     try {
       await MapboxGL.offlineManager.createPack(
         {
@@ -156,28 +152,20 @@ const App = () => {
           minZoom: 5,
           maxZoom: 14,
         },
-        progressListener,
-        errorListener
+        (offlineRegion, status) => console.log(`Progress: ${status.percentage}%`),
+        (offlineRegion, error) => console.log('Download error:', error)
       );
-      Alert.alert('Success', 'Ukraine map downloaded for offline use!');
+      Alert.alert('Success', 'Ukraine map downloaded!');
     } catch (error) {
-      Alert.alert('Error', 'Failed to download map: ' + error.message);
+      Alert.alert('Error', 'Failed to download map');
     }
-  };
-
-  const retryLocation = () => {
-    setLocationError(null);
-    startLocationTracking();
   };
 
   return (
     <View style={styles.container}>
-      <MapboxGL.MapView
-        style={styles.map}
-        styleURL={MapboxGL.StyleURL.Street}
-      >
+      <MapboxGL.MapView style={styles.map} styleURL={MapboxGL.StyleURL.Street}>
         <MapboxGL.Camera
-          zoomLevel={14}
+          zoomLevel={16}
           centerCoordinate={[targetCoordinate.longitude, targetCoordinate.latitude]}
           animationDuration={1000}
         />
@@ -209,30 +197,21 @@ const App = () => {
         <Text style={styles.buttonText}>Get Coordinates</Text>
       </TouchableOpacity>
 
-      {/* <TouchableOpacity style={styles.downloadButton} onPress={downloadUkraineMap}> */}
-      <TouchableOpacity style={styles.downloadButton} disabled={true}>
+      <TouchableOpacity style={styles.downloadButton} onPress={downloadUkraineMap}>
         <Text style={styles.buttonText}>Download Ukraine Map</Text>
       </TouchableOpacity>
 
       <View style={styles.infoBox}>
+        <Text style={[styles.infoText, {fontWeight: 'bold', color: serverStatus.includes('Connected') ? '#34C759' : '#FF3B30'}]}>
+          Server: {serverStatus}
+        </Text>
         <Text style={styles.infoText}>
-          Target: {targetCoordinate.latitude.toFixed(6)}, {targetCoordinate.longitude.toFixed(6)}
+          Target: {targetCoordinate.latitude.toFixed(7)}, {targetCoordinate.longitude.toFixed(7)}
         </Text>
         {userLocation && (
           <Text style={styles.infoText}>
-            You: {userLocation.latitude.toFixed(6)}, {userLocation.longitude.toFixed(6)}
+            You: {userLocation.latitude.toFixed(7)}, {userLocation.longitude.toFixed(7)}
           </Text>
-        )}
-        {!userLocation && hasLocationPermission && (
-          <Text style={styles.infoText}>Getting your location...</Text>
-        )}
-        {locationError && (
-          <>
-            <Text style={[styles.infoText, {color: 'red'}]}>Error: {locationError}</Text>
-            <TouchableOpacity onPress={retryLocation}>
-              <Text style={[styles.infoText, {color: '#007AFF', fontWeight: 'bold'}]}>Tap to retry</Text>
-            </TouchableOpacity>
-          </>
         )}
       </View>
     </View>

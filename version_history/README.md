@@ -7,3 +7,5 @@ v1.1: Fixes: added GPS debug (still doesn't show user's location; lots of errors
 v1.2: Fixes: added GPS tracking with low accuracy (shows only low accuracy location; still lots of errors)  
 
 v1.3: Fixes: added GPS tracking with high accuracy (switches between low/high accuracy location to ensure the minimal errors)  
+
+v2.0: Reading data from USB receiver and displaying them in the app instead of some fixed coordinates  

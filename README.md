@@ -1,6 +1,6 @@
 # ARKAN
 
-This is a React Native Android application designed for ARCAN. The app is currently built only for Android. Right now, it works for fixed coordinates only (will be changed to coordinates from receiver in the future). It's designed to work as an offline app but device must has Internet connection at the first launch to download the map (disabled for now).  
+This is a React Native Android application designed for ARCAN. The app is currently built only for Android. Right now, it works only when running local server (temporary workaround), receives and displays coordinates from USB receiver. It's designed to work as an offline app but device must has Internet connection at the first launch to download the map (disabled for now).  
 
 ## Features
 
@@ -23,6 +23,7 @@ Clone the repository, install dependencies, and run the app on Android:
 git clone https://github.com/rasthpop/arkan_POC.git  
 cd arkan_POC  
 git checkout mobile-app  
+python3 usb_server.py
 
 npm install  
 
